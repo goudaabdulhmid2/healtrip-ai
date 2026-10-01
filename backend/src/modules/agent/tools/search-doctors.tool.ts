@@ -1,20 +1,16 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 
 import { DoctorsService } from '../../doctors/doctors.service';
+import { SpecialtiesService } from '../../specialties/specialties.service';
+
 import { SearchDoctorsToolInputDto } from './dto/search-doctors-tool-input.dto';
 import { validateToolInput } from './utils/validate-tool-input';
-
-const SUPPORTED_SPECIALTIES = new Set([
-  'CARDIOLOGY',
-  'NEUROLOGY',
-  'DERMATOLOGY',
-  'ORTHOPEDICS',
-]);
 
 @Injectable()
 export class SearchDoctorsTool {
   constructor(
     private readonly doctorsService: DoctorsService,
+    private readonly specialtiesService: SpecialtiesService,
   ) {}
 
   async execute(input: unknown) {
@@ -23,7 +19,10 @@ export class SearchDoctorsTool {
       input,
     );
 
-    if (!SUPPORTED_SPECIALTIES.has(dto.specialty)) {
+    const specialtyExists =
+      await this.specialtiesService.existsByCode(dto.specialty);
+
+    if (!specialtyExists) {
       throw new BadRequestException(
         `Unsupported specialty: ${dto.specialty}`,
       );
