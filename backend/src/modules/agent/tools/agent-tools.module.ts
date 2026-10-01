@@ -6,6 +6,7 @@ import { SpecialtiesModule } from '../../specialties/specialties.module';
 
 import { SearchDoctorsTool } from './search-doctors.tool';
 import { SearchHospitalsTool } from './search-hospitals.tool';
+import { AgentToolRegistry } from './agent-tool.registry';
 
 @Module({
   imports: [
@@ -16,10 +17,12 @@ import { SearchHospitalsTool } from './search-hospitals.tool';
   providers: [
     SearchDoctorsTool,
     SearchHospitalsTool,
+    AgentToolRegistry,
   ],
   exports: [
     SearchDoctorsTool,
     SearchHospitalsTool,
+    AgentToolRegistry,
   ],
 })
 export class AgentToolsModule {}

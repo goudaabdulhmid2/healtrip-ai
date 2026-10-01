@@ -5,9 +5,10 @@ import { SpecialtiesService } from '../../specialties/specialties.service';
 
 import { SearchHospitalsToolInputDto } from './dto/search-hospitals-tool-input.dto';
 import { validateToolInput } from './utils/validate-tool-input';
+import { AgentTool } from './interfaces/agent-tool.interface';
 
 @Injectable()
-export class SearchHospitalsTool {
+export class SearchHospitalsTool implements AgentTool {
   constructor(
     private readonly hospitalsService: HospitalsService,
     private readonly specialtiesService: SpecialtiesService,
