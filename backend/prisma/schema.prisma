@@ -1,0 +1,117 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum ServiceType {
+  EMERGENCY
+  ICU
+  RADIOLOGY
+  LABORATORY
+  PHARMACY
+}
+
+model Doctor {
+  id                String   @id @default(uuid())
+  name              String
+  gender            Gender?
+  languages         String[]
+  yearsOfExperience Int?
+  summary           String?
+
+  specialties DoctorSpecialty[]
+  hospitals   DoctorHospital[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
+model Hospital {
+  id      String  @id @default(uuid())
+  name    String
+  city    String
+  summary String?
+
+  specialties HospitalSpecialty[]
+  doctors     DoctorHospital[]
+  services    HospitalService[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([city])
+  @@index([name])
+}
+
+model Specialty {
+  id   String @id @default(uuid())
+  code String @unique
+  name String
+
+  doctors   DoctorSpecialty[]
+  hospitals HospitalSpecialty[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
+model DoctorSpecialty {
+  doctorId    String
+  specialtyId String
+  isPrimary   Boolean @default(false)
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  specialty Specialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  @@id([doctorId, specialtyId])
+  @@index([specialtyId])
+}
+
+model DoctorHospital {
+  doctorId   String
+  hospitalId String
+  department String?
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  @@id([doctorId, hospitalId])
+  @@index([hospitalId])
+}
+
+model HospitalSpecialty {
+  hospitalId  String
+  specialtyId String
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  specialty Specialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  @@id([hospitalId, specialtyId])
+  @@index([specialtyId])
+}
+
+model HospitalService {
+  hospitalId String
+  service    ServiceType
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+
+  @@id([hospitalId, service])
+  @@index([service])
+}
