@@ -16,7 +16,7 @@ export class OpenRouterProvider implements LLMProvider {
   private readonly client: OpenAI;
 
   constructor() {
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey = process.env.LLM_API_KEY;
 
     if (!apiKey) {
       throw new Error(
@@ -26,7 +26,7 @@ export class OpenRouterProvider implements LLMProvider {
 
     this.client = new OpenAI({
       apiKey,
-      baseURL: 'https://openrouter.ai/api/v1',
+      baseURL: process.env.LLM_BASE_URL,
     });
   }
 
@@ -51,7 +51,7 @@ export class OpenRouterProvider implements LLMProvider {
 
       const response =
         await this.client.chat.completions.create({
-          model: 'openrouter/free',
+          model: process.env.LLM_MODEL ??  'openai.gpt-oss-120b-1:0',
           messages,
           tools,
           tool_choice: 'auto',
@@ -94,6 +94,7 @@ export class OpenRouterProvider implements LLMProvider {
         toolCalls,
       };
     } catch (error) {
+        console.error('Error generating response from OpenRouterProvider:', error);
       if (error instanceof BadGatewayException) {
         throw error;
       }
