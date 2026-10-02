@@ -13,11 +13,7 @@ export class HospitalsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async search(params: SearchHospitalsParams) {
-    const {
-      city,
-      specialty,
-      services,
-    } = params;
+    const { city, specialty, services } = params;
 
     const where: Prisma.HospitalWhereInput = {
       city: {
@@ -39,13 +35,13 @@ export class HospitalsService {
 
       ...(services?.length
         ? {
-            services: {
-              some: {
-                service: {
-                  in: services,
+            AND: services.map((service) => ({
+              services: {
+                some: {
+                  service,
                 },
               },
-            },
+            })),
           }
         : {}),
     };

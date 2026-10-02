@@ -501,3 +501,378 @@ Do not add a full specialty hierarchy/subspecialty taxonomy unless a concrete pr
 ### Status
 
 **ACCEPTED**
+
+---
+
+# 8. Implementation Decisions — Agent, Tools, Data, and Safety
+
+## D-008 — Hospital services are controlled enum values
+
+### Decision
+
+Represent hospital services as a controlled `ServiceType` enum rather than a free-text field or separate `Service` entity.
+
+Supported values:
+
+- EMERGENCY
+- ICU
+- RADIOLOGY
+- LABORATORY
+- PHARMACY
+
+### Why
+
+The prototype only needs a small, known set of hospital capabilities. Controlled values improve validation, tool calling, and grounding without introducing unnecessary schema complexity.
+
+### Status
+
+**ACCEPTED**
+
+## D-009 — Doctor ↔ Hospital is many-to-many
+
+### Decision
+
+Use `DoctorHospital` as the relationship table between doctors and hospitals. The relationship may carry `department` as an attribute.
+
+### Why
+
+A doctor can practice at multiple hospitals, and a hospital can have multiple doctors. The relationship itself may contain department information without introducing a separate department domain model.
+
+### Status
+
+**ACCEPTED**
+
+## D-010 — Tools use semantic values, not database IDs
+
+### Decision
+
+LLM tool contracts use canonical semantic values such as `CARDIOLOGY` and `Madinah`, not internal PostgreSQL IDs.
+
+The LLM never needs to know database primary keys.
+
+### Why
+
+This keeps the agent contract understandable, avoids leaking internal identifiers, and makes tool calls easier to validate and audit.
+
+### Status
+
+**ACCEPTED**
+
+## D-011 — Two tools only for the MVP
+
+### Decision
+
+The agent exposes only:
+
+- `search_doctors`
+- `search_hospitals`
+
+Second-opinion intent is treated as context for doctor search rather than a separate tool.
+
+### Why
+
+These tools directly demonstrate the assessment requirement for tool/function calling and database-backed provider discovery without unnecessary scope.
+
+### Status
+
+**ACCEPTED**
+
+## D-012 — Simple Hybrid agent loop with bounded iterations
+
+### Decision
+
+Use an LLM tool-calling loop with a maximum of 3 tool iterations rather than a full workflow/state-machine engine.
+
+### Why
+
+It preserves genuine agentic tool selection while keeping orchestration small enough for the <24h prototype.
+
+### Status
+
+**ACCEPTED**
+
+## D-013 — LLM provider behind an abstraction
+
+### Decision
+
+Introduce an internal `LLMProvider` interface and inject it through a NestJS token. The OpenRouter implementation is an adapter behind this interface.
+
+### Why
+
+It keeps the Agent independent from the vendor SDK and makes provider replacement/testing easier.
+
+### Status
+
+**ACCEPTED**
+
+## D-014 — OpenRouter + OpenAI-compatible SDK for the prototype
+
+### Decision
+
+Use the OpenAI Node SDK configured with the OpenRouter base URL, with the current prototype model target `openrouter/free`.
+
+### Why
+
+It provides an OpenAI-compatible tool-calling interface while keeping the prototype implementation small and allowing the LLM provider to remain behind the internal abstraction.
+
+### Status
+
+**ACCEPTED**
+
+## D-015 — Tool arguments are validated independently of the LLM
+
+### Decision
+
+Every registered tool validates its incoming arguments through DTOs and `class-validator` before execution. DTO transforms perform deterministic input normalization such as trimming and uppercasing canonical codes where appropriate.
+
+### Why
+
+LLM output is untrusted input. Validation must remain a backend responsibility.
+
+### Status
+
+**ACCEPTED**
+
+## D-016 — Canonical specialty validation uses `Specialty.code`
+
+### Decision
+
+`Specialty.code` is the canonical semantic identifier. Tool validation checks specialty existence by code using `existsByCode`, then queries by code. Internal DB IDs remain internal.
+
+### Why
+
+It avoids unnecessary row retrieval and gives the agent a stable semantic vocabulary.
+
+### Status
+
+**ACCEPTED**
+
+## D-017 — Tool classes implement `AgentTool`
+
+### Decision
+
+`SearchDoctorsTool` and `SearchHospitalsTool` implement `AgentTool`. Domain services (`DoctorsService`, `HospitalsService`) remain unaware of agent/tool orchestration.
+
+### Why
+
+This keeps agent integration at the application/tool boundary and preserves clean domain/service responsibilities.
+
+### Status
+
+**ACCEPTED**
+
+## D-018 — Tool Registry is the tool allow-list
+
+### Decision
+
+`AgentToolRegistry` maps explicit tool names to registered backend tool implementations.
+
+### Why
+
+The LLM can only cause execution of tools registered by the backend. Unknown tool names are rejected.
+
+### Status
+
+**ACCEPTED**
+
+## D-019 — Structured tool output is whitelisted
+
+### Decision
+
+Tools do not pass raw Prisma records to the LLM. They return explicitly selected structured fields.
+
+Doctor result fields:
+
+- name
+- gender
+- languages
+- yearsOfExperience
+- specialties
+- hospitals (name, city, department)
+
+Hospital result fields:
+
+- name
+- city
+- specialties
+- services
+
+### Why
+
+This reduces unnecessary data exposure and narrows the factual surface available to the LLM, improving grounding and preventing it from interpreting internal fields such as IDs/timestamps.
+
+### Status
+
+**ACCEPTED**
+
+## D-020 — LLM may translate user-facing controlled values, but must preserve meaning
+
+### Decision
+
+Canonical tool values remain English/system-defined (`CARDIOLOGY`, `EMERGENCY`, `Madinah`, etc.). The LLM may render supported values in Arabic for the user using explicit mappings.
+
+Hospital names may be rendered in Arabic when identity is preserved; the LLM must not rename or replace the institution.
+
+### Why
+
+This separates machine-facing canonical values from user-facing language while preserving factual identity.
+
+### Status
+
+**ACCEPTED**
+
+## D-021 — Backend safety guard is the actual safety boundary
+
+### Decision
+
+A deterministic `SafetyGuard` assesses the original user message before tool execution. If configured urgent patterns are detected, routine provider/hospital search tools are blocked in the backend.
+
+### Why
+
+Prompt instructions alone are not a sufficient safety boundary. The backend must be able to prevent an unsafe tool execution even if the LLM proposes one.
+
+### Status
+
+**ACCEPTED**
+
+## D-022 — Safety guard is intentionally coarse, not a medical diagnosis engine
+
+### Decision
+
+The safety guard uses a small set of explicit red-flag patterns for the prototype (for example severe chest pain with breathing difficulty) and does not attempt comprehensive medical diagnosis or triage.
+
+### Why
+
+The assessment requires safety-aware behavior, not a clinical decision engine. A broad medical rules engine would be unnecessary scope and difficult to validate safely within the time constraint.
+
+### Status
+
+**ACCEPTED**
+
+## D-023 — No emergency phone number generated by the LLM
+
+### Decision
+
+The system prompt explicitly prohibits the LLM from guessing or providing emergency phone numbers. Urgent responses direct users to local emergency services / immediate professional care without assuming a country.
+
+### Why
+
+Emergency numbers are location-dependent and should not be hallucinated by the model.
+
+### Status
+
+**ACCEPTED**
+
+## D-024 — Hospital service filters use ALL semantics
+
+### Decision
+
+When multiple services are supplied to `search_hospitals`, the hospital must have **all** requested services. Specialty remains an additional required filter when supplied.
+
+Example: `CARDIOLOGY + EMERGENCY + ICU` means the hospital must match cardiology and all three requested service values.
+
+### Why
+
+This matches the natural meaning of an explicit conjunction such as "cardiology and emergency" and makes multi-service filtering predictable.
+
+### Status
+
+**ACCEPTED**
+
+## D-025 — City remains a String in the MVP
+
+### Decision
+
+Hospital city is stored as a String rather than introducing a `City` entity.
+
+### Why
+
+The prototype only needs a small set of cities. A city entity would add normalization and relationship complexity without a demonstrated requirement.
+
+### Status
+
+**ACCEPTED**
+
+## D-026 — Remove `subspecialty` from the MVP contract
+
+### Decision
+
+Do not include `subspecialty` in the current DB/tool contract.
+
+### Why
+
+The current assessment scenarios do not require it, and introducing it would expand the medical taxonomy unnecessarily.
+
+### Status
+
+**ACCEPTED**
+
+## D-027 — Agent contract: actions are represented by tool calls plus natural-language responses
+
+### Decision
+
+The current implementation uses registered tool calls for executable actions and natural-language responses/clarification for non-tool actions. No separate persisted action-state machine is introduced.
+
+### Why
+
+This is sufficient for the demonstrated scenarios while keeping the Agent implementation small.
+
+### Status
+
+**ACCEPTED**
+
+## D-028 — City canonicalization is primarily an LLM semantic-understanding responsibility
+
+### Decision
+
+The LLM is instructed to convert Arabic/English city expressions to canonical tool values before tool calls (for example `المدينة المنورة` → `Madinah`). Backend validation remains responsible for rejecting unsupported values.
+
+### Why
+
+Natural-language semantic normalization belongs naturally at the LLM boundary, while backend validation remains the authoritative correctness boundary. A large backend translation/rules engine is out of scope.
+
+### Status
+
+**ACCEPTED**
+
+## D-029 — Do not pass raw provider summaries to the LLM
+
+### Decision
+
+`SearchDoctorsTool` and `SearchHospitalsTool` return whitelisted structured facts instead of raw Prisma records. Free-text provider summaries are excluded from the current doctor tool result.
+
+### Why
+
+Testing exposed that free-text summaries created extra opportunities for the LLM to reinterpret or embellish provider information. Structured fields provide a tighter grounding boundary.
+
+### Status
+
+**ACCEPTED**
+
+## D-030 — Tool output is the factual source of truth; LLM controls wording only
+
+### Decision
+
+The LLM may choose presentation wording, ordering, and supported user-language translations, but it must not add provider/hospital facts beyond the structured tool result.
+
+### Why
+
+This directly satisfies the assessment requirement to prevent hallucinated provider facts while retaining a natural conversational interface.
+
+### Status
+
+**ACCEPTED**
+
+## D-031 — Current prototype scope is backend-complete before frontend work
+
+### Decision
+
+Before starting the frontend, freeze the current Agent/Tool/DB scope and perform a full implementation audit against requirements and best practices. Only audit findings that are necessary, clearly valuable, or explicitly required should trigger additional implementation.
+
+### Why
+
+The prototype already demonstrates the core end-to-end Agent → Tool → PostgreSQL flow. The remaining time should prioritize requirement coverage, correctness, security, error handling, and demo readiness rather than adding features.
+
+### Status
+
+**ACCEPTED**

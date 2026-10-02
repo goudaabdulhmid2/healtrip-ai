@@ -15,13 +15,22 @@ export class DoctorsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async search(params: SearchDoctorsParams) {
-    const {
-      specialty,
-      city,
-      hospital,
-      gender,
-      language,
-    } = params;
+    const { specialty, city, hospital, gender, language } = params;
+
+    const hospitalWhere: Prisma.HospitalWhereInput = {
+      city: {
+        equals: city,
+        mode: 'insensitive',
+      },
+      ...(hospital
+        ? {
+            name: {
+              contains: hospital,
+              mode: 'insensitive' as const,
+            },
+          }
+        : {}),
+    };
 
     const where: Prisma.DoctorWhereInput = {
       gender,
@@ -41,17 +50,7 @@ export class DoctorsService {
 
       hospitals: {
         some: {
-          hospital: {
-            city,
-            ...(hospital
-              ? {
-                  name: {
-                    contains: hospital,
-                    mode: 'insensitive',
-                  },
-                }
-              : {}),
-          },
+          hospital: hospitalWhere,
         },
       },
     };
@@ -65,6 +64,9 @@ export class DoctorsService {
           },
         },
         hospitals: {
+          where: {
+            hospital: hospitalWhere,
+          },
           include: {
             hospital: true,
           },

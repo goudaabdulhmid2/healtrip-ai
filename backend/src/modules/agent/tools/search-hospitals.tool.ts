@@ -1,11 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-
 import { HospitalsService } from '../../hospitals/hospitals.service';
 import { SpecialtiesService } from '../../specialties/specialties.service';
-
+import { AgentTool } from './interfaces/agent-tool.interface';
 import { SearchHospitalsToolInputDto } from './dto/search-hospitals-tool-input.dto';
 import { validateToolInput } from './utils/validate-tool-input';
-import { AgentTool } from './interfaces/agent-tool.interface';
 
 @Injectable()
 export class SearchHospitalsTool implements AgentTool {
@@ -22,9 +20,7 @@ export class SearchHospitalsTool implements AgentTool {
 
     if (dto.specialty) {
       const specialtyExists =
-        await this.specialtiesService.existsByCode(
-          dto.specialty,
-        );
+        await this.specialtiesService.existsByCode(dto.specialty);
 
       if (!specialtyExists) {
         throw new BadRequestException(
@@ -42,7 +38,19 @@ export class SearchHospitalsTool implements AgentTool {
     return {
       success: true,
       count: hospitals.length,
-      hospitals,
+
+      hospitals: hospitals.map((hospital) => ({
+        name: hospital.name,
+        city: hospital.city,
+
+        specialties: hospital.specialties.map(
+          (item) => item.specialty.code,
+        ),
+
+        services: hospital.services.map(
+          (item) => item.service,
+        ),
+      })),
     };
   }
 }

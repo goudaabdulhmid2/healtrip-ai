@@ -1,11 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-
 import { DoctorsService } from '../../doctors/doctors.service';
 import { SpecialtiesService } from '../../specialties/specialties.service';
-
+import { AgentTool } from './interfaces/agent-tool.interface';
 import { SearchDoctorsToolInputDto } from './dto/search-doctors-tool-input.dto';
 import { validateToolInput } from './utils/validate-tool-input';
-import {AgentTool} from './interfaces/agent-tool.interface';
 
 @Injectable()
 export class SearchDoctorsTool implements AgentTool {
@@ -40,7 +38,23 @@ export class SearchDoctorsTool implements AgentTool {
     return {
       success: true,
       count: doctors.length,
-      doctors,
+
+      doctors: doctors.map((doctor) => ({
+        name: doctor.name,
+        gender: doctor.gender,
+        languages: doctor.languages,
+        yearsOfExperience: doctor.yearsOfExperience,
+
+        specialties: doctor.specialties.map(
+          (item) => item.specialty.code,
+        ),
+
+        hospitals: doctor.hospitals.map((item) => ({
+          name: item.hospital.name,
+          city: item.hospital.city,
+          department: item.department,
+        })),
+      })),
     };
   }
 }
